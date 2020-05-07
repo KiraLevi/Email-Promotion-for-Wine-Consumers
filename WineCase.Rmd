@@ -1,0 +1,402 @@
+---
+title: "WineCase"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Read in Data
+```{r}
+rm(list = ls())
+library(dplyr)
+library(tidyr)
+library(data.table)
+library(ggplot2)
+library(grf)
+setwd("~/Desktop/UR/Spring A/GBA424 Analytics Design and Applications/Case4 Wine Retailer Case 1904")
+d = read.csv("test_data_1904.csv", stringsAsFactors = TRUE)
+```
+
+## Summary Stats for Treatment and Control
+```{r}
+dt = data.table(d)
+dagg = dt[,.(open = mean(open), click=mean(click), purch = mean(purch),seOpen = sd(open)/sqrt(.N), seClick=sd(click)/sqrt(.N), sePurch = sd(purch)/sqrt(.N),.N),by = .(group)]
+dagg
+```
+
+## Plot results of Purchase given the treatment or control
+```{r}
+dodge = position_dodge(width=1); ##to form constant dimensions
+ggplot(aes(x=group,y=purch,ymax=purch+sePurch,ymin=purch-sePurch),data=dagg)+
+  geom_bar(position=dodge,stat="identity",col=2:3,fill=2:3) + 
+  geom_errorbar(position=dodge)
+  labs(x="Group",y="Purchases")
+  
+##Even when taking standard errors into account, the purchase of each group, in dollar amounts
+##does not overlap. Could this signify that the email has an impact on purchase amount?
+
+```
+
+```{r}
+summary(lm(purch~group,data=d)) 
+## We observe that the baseline purchase amount is $12.77
+## If given the treatment of email, expect purchase to increase by $1.35, from the baseline of no email
+
+##Will not add covariates as the treatment effect appears to be large and significant on its own.
+##Worst case scenario: $1.02 increase in purchase
+##Best case scenario: $1.66 increase in purchases
+```
+
+## Histogram of Effect given Purchase Recency (60 Days as recent purchase)
+```{r}
+hist(d$last_purch, 
+     xlab="Days Since Last Purchase", ylab="Customers", 
+     main="Histogram of Days Since Last Purchase")
+d$recentPurch = (d$last_purch < 60)
+dt = data.table(d)
+
+## Will use 60 Days as a recent customer. May consider 65 to keep both recent and non recent group equal in 
+## sample size
+```
+
+## Responses to treatment given whether or not they are recent buyers
+```{r}
+dagg = dt[,.(open = mean(open), click=mean(click), purch = mean(purch),seOpen = sd(open)/sqrt(.N), seClick=sd(click)/sqrt(.N), sePurch = sd(purch)/sqrt(.N),.N),by = .(group,recentPurch)]
+dagg
+
+##Effect of treatment given type of customer
+# Recent Buyer: Increase of $1.74 when receive email
+# Old Buyer: Increase of $0.92 when receive email
+```
+
+```{r}
+dodge = position_dodge(width=1); ##to form constant dimensions
+ggplot(aes(fill=group,y=purch,x=recentPurch,ymax=purch+sePurch,ymin=purch-sePurch),data=dagg)+
+  geom_bar(position=dodge,stat="identity") + 
+  geom_errorbar(position=dodge)
+  labs(x="Group",y="Purchases")
+  
+## Still no overlap of effects, even when taking standard errors into account
+
+```
+
+## Slicing on different type of website visits
+```{r}
+dagg = dt[,.(open = mean(open), click=mean(click), purch = mean(purch),seOpen = sd(open)/sqrt(.N), seClick=sd(click)/sqrt(.N), sePurch = sd(purch)/sqrt(.N),.N),by = .(group, visits >5)]
+dagg
+
+## Visit is True : 1.17
+## Visit is False: 1.50
+
+##Intuition:
+# Likely that those who visit t
+```
+
+```{r}
+dodge = position_dodge(width=1); ##to form constant dimensions
+ggplot(aes(fill=group,y=purch,x=visits,ymax=purch+sePurch,ymin=purch-sePurch),data=dagg)+
+  geom_bar(position=dodge,stat="identity") + 
+  geom_errorbar(position=dodge)
+  labs(x="Group",y="Purchases")
+  
+## Still no overlap between email and no email, difference is a lot tighter for those who visit more recently
+```
+
+## Slicing on wine preference: Chardonay
+```{r}
+dagg = dt[,.(open = mean(open), click=mean(click), purch = mean(purch),seOpen = sd(open)/sqrt(.N), seClick=sd(click)/sqrt(.N), sePurch = sd(purch)/sqrt(.N),.N),by = .(group, chard >5)]
+dagg
+
+## No Chardonay: 1.16
+## Buys Chardonay:1.686856
+
+##Intuition:
+# A majority of the people do not buy chardonay, and a lot less buy it. This is  then reflected in the
+# standard errors. Even when taking the larger standard errors into account we observe that the groups are still
+# different in treatment effect
+# email has a bigger impact on individuals that buy chardonay...
+
+```
+```{r}
+dodge = position_dodge(width=1); ##to form constant dimensions
+ggplot(aes(fill=group,y=purch,x=chard,ymax=purch+sePurch,ymin=purch-sePurch),data=dagg)+
+  geom_bar(position=dodge,stat="identity") + 
+  geom_errorbar(position=dodge)
+  labs(x="Group",y="Purchases")
+  
+  
+```
+
+## Slicing on wine preference: sauvignon blanc
+```{r}
+dagg = dt[,.(open = mean(open), click=mean(click), purch = mean(purch),seOpen = sd(open)/sqrt(.N), seClick=sd(click)/sqrt(.N), sePurch = sd(purch)/sqrt(.N),.N),by = .(group, sav_blanc >0)]
+dagg
+
+##Treatment effect... email
+## No Sauvignon Blanc : $.75
+## Buys Sauvignon Blanc: $2.80
+
+##Intuition:
+# The email treatment appears to have a greater impact on purchase for those that purchase sauvignon blanc
+# Could this be as a result of the price, popularity, promotions for sauv blanc...
+# More likely to try a product that is less expensive... 
+# Standard errors are worrysome but expected due to sample size
+
+```
+
+```{r}
+dodge = position_dodge(width=1); ##to form constant dimensions
+ggplot(aes(fill=group,y=purch,x=sav_blanc,ymax=purch+sePurch,ymin=purch-sePurch),data=dagg)+
+  geom_bar(position=dodge,stat="identity") + 
+  geom_errorbar(position=dodge)
+  labs(x="Group",y="Purchases")
+  
+```
+
+## Slicing on wine preference: syrah 
+```{r}
+dagg = dt[,.(open = mean(open), click=mean(click), purch = mean(purch),seOpen = sd(open)/sqrt(.N), seClick=sd(click)/sqrt(.N), sePurch = sd(purch)/sqrt(.N),.N),by = .(group, syrah >0)]
+dagg
+
+#email is only effective for those that do not buy syrah
+# Does not buy syrah : $1.46871
+
+```
+
+```{r}
+dodge = position_dodge(width=1); ##to form constant dimensions
+ggplot(aes(fill=group,y=purch,x=syrah,ymax=purch+sePurch,ymin=purch-sePurch),data=dagg)+
+  geom_bar(position=dodge,stat="identity") + 
+  geom_errorbar(position=dodge)
+  labs(x="Group",y="Purchases")
+  
+```
+
+## Slicing on wine preference: syrah 
+```{r}
+dagg = dt[,.(open = mean(open), click=mean(click), purch = mean(purch),seOpen = sd(open)/sqrt(.N), seClick=sd(click)/sqrt(.N), sePurch = sd(purch)/sqrt(.N),.N),by = .(group, cab >0)]
+dagg
+
+#Treatment effect on cabernet buyers
+# Does not buy Cabernet : $1.08651
+# Buys Carbenet: $1.95
+
+##email may be more effective for cab lovers
+
+
+```
+
+```{r}
+dodge = position_dodge(width=1); ##to form constant dimensions
+ggplot(aes(fill=group,y=purch,x=cab,ymax=purch+sePurch,ymin=purch-sePurch),data=dagg)+
+  geom_bar(position=dodge,stat="identity") + 
+  geom_errorbar(position=dodge)
+  labs(x="Group",y="Purchases")
+  
+```
+
+## Repeated significance testing
+## Measuring causal effects with regression: Conditional causal effects
+## 1. last_purch
+```{r}
+summary(lm(purch~0+recentPurch + group:recentPurch,data=d))
+```
+## 2. visits
+```{r}
+d$highvisits = (d$visits >5)
+summary(lm(purch~0+highvisits+group:(highvisits),data=d))
+```
+## 3. past_purch
+```{r}
+d$highpast_purch = (d$past_purch >60)
+summary(lm(purch~0+highpast_purch+group:(highpast_purch),data=d))
+```
+## 4. chard
+```{r}
+d$boughtchard = (d$chard >0)
+summary(lm(purch~0+boughtchard+group:(boughtchard),data=d))
+```
+## 5. sav_blanc
+```{r}
+d$boughtsav = (d$sav_blanc >0)
+summary(lm(purch~0+boughtsav+group:(boughtsav),data=d))
+```
+## 6. syrah
+```{r}
+d$boughtsyrah = (d$syrah >0)
+summary(lm(purch~0+boughtsyrah+group:(boughtsyrah),data=d))
+```
+## 7. cab
+```{r}
+d$boughtcab = (d$cab >0)
+summary(lm(purch~0+boughtcab+group:(boughtcab),data=d))
+```
+
+## Incrementality: Lift aka Uplift model for purchase amount 
+```{r}
+d$email = (d$group != "ctrl")
+m <- lm(purch ~ email*(last_purch < 60) + email*(past_purch > 60) + email*(visits > 5) +
+                 email*(chard > 0) + email*(sav_blanc>0)  + email*(cab>0), 
+         data=d)
+summary(m)$coef
+```
+
+
+## Scoring customers with an uplift model
+If you have someone who wasn't in the test, but you know their baseline variables, you can use an uplift model to predict likely treatment effect. 
+```{r}
+new_cust <- data.frame(chard=rep(38.12, 2), sav_blanc=rep(0, 2), 
+                       syrah=rep(0, 2), cab=rep(0, 2),  
+                       past_purch=rep(38.12,2), last_purch=rep(19,2), 
+                       visits=rep(3,2))
+(pred <- predict(m, cbind(email=c(TRUE, FALSE), new_cust)))
+(lift <- pred[1] - pred[2])
+```
+
+
+## Causal forests
+## training model
+```{r}
+set.seed(1)
+cf_size <- 60000; #nrow(d) 
+cf_set = sample(nrow(d),cf_size)
+treat <- d$email[cf_set]
+response <- d$purch[cf_set]
+baseline <- d[cf_set, c("last_purch", 'past_purch',"visits", "chard", "sav_blanc",  "cab")]
+tmp=proc.time()[3]
+cf <- causal_forest(baseline, response, treat)
+tmp = proc.time()[3]-tmp
+print(cf)
+```
+
+## Overall average treatment effect
+```{r}
+average_treatment_effect(cf, method="AIPW")
+```
+
+## Predicted uplift 
+Just like any uplift model, we can use the model to predict the email effect for new customers. 
+```{r}
+new_cust <- data.frame(chard=38.12, sav_blanc=0, syrah=0, cab=0, last_purch=19, visits=3)
+predict(cf, new_cust, estimate.variance = TRUE)
+```
+## Predicted uplift for all customers in training set
+```{r}
+hist(predict(cf)$predictions, 
+     main="Histogram of Purchase Lift", 
+     xlab="Purchase Lift for Email", ylab="Customers")
+```
+
+```{r}
+baseline$pred = predict(cf, baseline)$predictions
+baseline$score <- baseline$pred*0.3 - 0.1
+## the costomers with score > 0.1 will be our targeted customers
+write.csv(baseline,'training.csv')
+percent <- nrow(baseline[baseline$score > 0,])/60000
+percent
+```
+
+
+## Uplift versus past purchase amount
+```{r}
+trans_gray <- rgb(0.1, 0.1, 0.1, alpha=0.1)
+plot(d$past_purch[1:cf_size], predict(cf)$predictions, 
+     cex=0.5, col=trans_gray,
+     xlab="Past Purchase Amount ($)", ylab="Predicted Treatment Effect ($)")
+```
+
+## Uplift versus days since last purchase
+```{r}
+trans_gray <- rgb(0.1, 0.1, 0.1, alpha=0.1)
+plot(d$last_purch[1:cf_size], predict(cf)$predictions, 
+     cex=0.5, col=trans_gray,
+     xlab="Days Since Last Purchase", ylab="Predicted Treatment Effect ($)")
+```
+## Test model using test set
+```{r}
+test = d[-cf_set, c("last_purch", 'past_purch',"visits", "chard", "sav_blanc",  "cab")]
+test$pred = predict(cf, test)$predictions
+```
+
+## Predict lift using entire set
+```{r}
+entire = d[,c("last_purch", 'past_purch',"visits", "chard", "sav_blanc",  "cab")]
+entire$pred = predict(cf,entire)$predictions
+```
+
+## Summary of target customers
+```{r}
+entire$target=entire$pred>(.10/.3)
+targetcus = entire[entire$target==TRUE,]
+summary(targetcus)
+```
+
+## Evaluate segmentation amongst those chosen for target email
+```{r}
+entireTRUE = entire[entire$target==TRUE,]
+lastPurchTRUE = nrow(entireTRUE[entireTRUE$last_purch<60,])/nrow(entireTRUE)
+pastPurchTRUE = nrow(entireTRUE[entireTRUE$past_purch>60,])/nrow(entireTRUE)
+visitsTRUE = nrow(entireTRUE[entireTRUE$visits>5,])/nrow(entireTRUE) 
+chardTRUE = nrow(entireTRUE[entireTRUE$chard>0,])/nrow(entireTRUE)
+savBlancTRUE = nrow(entireTRUE[entireTRUE$sav_blanc>0,])/nrow(entireTRUE)
+cabTRUE = nrow(entireTRUE[entireTRUE$cab>0,])/nrow(entireTRUE)
+
+segTRUE = c("last purch"=lastPurchTRUE,"past purch"=pastPurchTRUE,
+            "visits"= visitsTRUE, "chard"=chardTRUE,"sav_Blanch" = savBlancTRUE,
+            "cab" = cabTRUE)
+```
+
+```{r}
+entireFALSE = entire[entire$target==FALSE,]
+lastPurchFALSE = nrow(entireFALSE[entireFALSE$last_purch<60,])/nrow(entireFALSE)
+pastPurchFALSE = nrow(entireFALSE[entireFALSE$past_purch>60,])/nrow(entireFALSE)
+visitsFALSE = nrow(entireFALSE[entireFALSE$visits>5,])/nrow(entireFALSE) 
+chardFALSE = nrow(entireFALSE[entireFALSE$chard>0,])/nrow(entireFALSE)
+savBlancFALSE = nrow(entireFALSE[entireFALSE$sav_blanc>0,])/nrow(entireFALSE)
+cabFALSE = nrow(entireFALSE[entireFALSE$cab>0,])/nrow(entireFALSE)
+
+segFALSE = c("last purch"=lastPurchFALSE,"past purch"=pastPurchFALSE,
+            "visits"= visitsFALSE, "chard"=chardFALSE,"sav_Blanch" = savBlancFALSE,
+            "cab" = cabFALSE)
+```
+
+```{r}
+segTRUE
+segFALSE
+seg = as.data.frame(rbind(segFALSE,segTRUE))
+```
+
+## Predict target email for new customer
+```{r}
+##newChard, newSav, newSyrah, newCab: dollar amount spent per type of wine; Input 0 if not purchased
+##newLastPurch: the number of days since last purchase.
+##newPastPurch: dollar amount of previous purchase
+##newVisits: number of visits to website by individual
+
+##################################################
+##### Input Values to evaluate new customer ######
+##################################################
+newChard = 29
+newSav = 54
+newCab = 98
+newLastPurch = 20
+newPastPurch = 12
+newVisits = 6
+##################################################
+##### Input Values to evaluate new customer ######
+##################################################
+
+new_cust <- data.frame(chard=newChard, sav_blanc=newSav, cab=newCab, 
+                       last_purch= newLastPurch, past_purch = newPastPurch ,visits=newVisits)
+value = (predict(cf, new_cust, estimate.variance = TRUE))
+if(value[1] > (.1/.3)){
+  print("Send Target Email")
+}else{
+  print("Do not send Target Email")
+}
+
+```
+
